@@ -3,11 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pi xStream IPTV Player</title>
+	<meta name="theme-color" content="#007bff"> <!-- Matches button gradient -->
+    <meta name="description" content="PiXStream IPTV - Stream your favorite channels">
+    <title>PixStream IPTV</title>
     <link rel="stylesheet" href="./css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script disable-devtool-auto src='https://cdn.jsdelivr.net/npm/disable-devtool@latest'></script>
+    <link rel="manifest" href="manifest.json">
+    <!-- Apple Touch Icon for iOS -->
+    <link rel="apple-touch-icon" href="./img/icon-192x192.png">
 </head>
 <body>
     <div class="container">
@@ -81,5 +86,14 @@
 
     <script src="./js/script.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+	<script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registered:', reg))
+                    .catch(err => console.error('Service Worker registration failed:', err));
+            });
+        }
+    </script>
 </body>
 </html>
