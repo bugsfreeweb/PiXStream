@@ -5,47 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>xStream IPTV</title>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
     <div class="container">
         <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h1>xStream</h1>
+                <img src="./img/logo.png" alt="xStream Logo" class="logo">
             </div>
             <div class="sidebar-content">
                 <!-- Playlist -->
                 <div class="sidebar-section">
-                    <h3>Playlist</h3>
-                    <input type="text" id="playlistUrl" placeholder="Enter Playlist URL">
-                    <button onclick="loadPlaylist()" id="loadBtn">⬇</button>
+                    <div class="url-input-group">
+                        <input type="text" id="playlistUrl" placeholder="Enter Playlist URL">
+                        <button onclick="loadPlaylist()" id="loadBtn"><i class="fas fa-download"></i></button>
+                    </div>
                     <input type="file" id="fileUpload" accept=".m3u,.json,.txt" onchange="loadFile()">
-                    <button onclick="toggleFavourites()">★</button>
-                    <button onclick="toggleHistory()">↻</button>
+                    <div class="playlist-controls">
+                        <button onclick="toggleFavourites()" title="Favourites"><i class="fas fa-star"></i></button>
+                        <button onclick="toggleHistory()" title="History"><i class="fas fa-history"></i></button>
+                        <button onclick="clearAllData()" title="Clear All"><i class="fas fa-trash-alt"></i></button>
+                    </div>
                 </div>
 
                 <!-- Channels -->
-                <div class="sidebar-section">
-                    <h3>Channels</h3>
+                <div class="sidebar-section channels">
                     <input type="text" id="filter" placeholder="Search Channels" onkeyup="filterChannels()">
                     <div class="channel-list" id="channelList"></div>
                     <div class="history-list" id="historyList" style="display: none;"></div>
                 </div>
 
-                <!-- Settings -->
-                <div class="sidebar-section">
-                    <h3>Settings</h3>
-                    <select id="language" onchange="changeLanguage()">
-                        <option value="en">EN</option>
-                        <option value="es">ES</option>
-                    </select>
-                    <input type="password" id="parentalPin" placeholder="Set Parental PIN">
-                    <button onclick="setParentalPin()">🔒</button>
-                    <select id="profile" onchange="switchProfile()">
-                        <option value="adult">👤</option>
-                        <option value="child">👶</option>
-                    </select>
+                <!-- Status -->
+                <div class="sidebar-section status">
+                    <div class="playlist-status" id="playlistStatus">
+                        <span class="total">Total: 0</span>
+                        <span class="active">Active: 0</span>
+                        <span class="offline">Offline: 0</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -54,17 +52,29 @@
         <div class="player-section" id="playerSection">
             <div class="top-controls" id="topControls">
                 <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
-                    <span class="toggle-icon">☰</span>
+                    <i class="fas fa-bars"></i>
                 </button>
                 <label class="theme-switch">
                     <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
-                    <span class="slider"></span>
+                    <span class="slider"><i class="fas fa-moon"></i><i class="fas fa-sun"></i></span>
                 </label>
             </div>
-            <video id="videoPlayer" controls autoplay>
+            <div class="now-playing" id="nowPlaying"></div>
+            <div class="notification" id="notification"></div>
+            <video id="videoPlayer" autoplay>
                 <track kind="subtitles" id="subtitleTrack" src="" srclang="en" label="English">
                 Your browser doesn’t support video playback.
             </video>
+            <div class="player-controls" id="playerControls">
+                <button id="playPauseBtn" onclick="togglePlayPause()" title="Play/Pause"><i class="fas fa-play"></i></button>
+                <button id="fullscreenBtn" onclick="toggleFullscreen()" title="Fullscreen"><i class="fas fa-expand"></i></button>
+                <button id="pipBtn" onclick="togglePiP()" title="Picture-in-Picture"><i class="fas fa-window-restore"></i></button>
+                <button id="castBtn" onclick="castStream()" title="Cast"><i class="fas fa-tv"></i></button>
+                <input type="file" id="subtitleUpload" accept=".srt" onchange="loadSubtitles()" style="display: none;">
+                <button id="subtitleBtn" onclick="document.getElementById('subtitleUpload').click()" title="Subtitles"><i class="fas fa-closed-captioning"></i></button>
+                <button id="randomBtn" onclick="playRandom()" title="Random"><i class="fas fa-random"></i></button>
+                <span id="qualityIndicator"></span>
+            </div>
         </div>
     </div>
 

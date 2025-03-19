@@ -3,38 +3,42 @@ const channelList = document.getElementById('channelList');
 const historyList = document.getElementById('historyList');
 const sidebar = document.getElementById('sidebar');
 const themeToggle = document.getElementById('themeToggle');
+const playlistStatus = document.getElementById('playlistStatus');
+const nowPlaying = document.getElementById('nowPlaying');
+const notification = document.getElementById('notification');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const qualityIndicator = document.getElementById('qualityIndicator');
 let channels = JSON.parse(localStorage.getItem('channels')) || [];
-let parentalPin = localStorage.getItem('parentalPin') || null;
-let currentProfile = localStorage.getItem('currentProfile') || 'adult';
 let history = JSON.parse(localStorage.getItem('uploadHistory')) || [];
+let recentPlays = JSON.parse(localStorage.getItem('recentPlays')) || [];
 let showFavourites = false;
 let showHistory = false;
 let hls = null;
 let currentChannelUrl = null;
-
-const translations = {
-    en: { load: '⬇', pin: '🔒', placeholder: 'Enter Playlist URL' },
-    es: { load: '⬇', pin: '🔒', placeholder: 'Ingresa URL de Lista' }
-};
+let currentStreamName = '';
 
 async function loadPlaylist() {
     const url = document.getElementById('playlistUrl').value;
-    if (!url) return alert('Please enter a valid URL.');
+    if (!url) return showNotification('Please enter a valid URL.');
+    showNotification('Loading playlist...');
     try {
         const response = await fetch(url);
         const text = await response.text();
         parseM3U(text);
-        addToHistory(url, 'URL');
+        addToHistory(url);
         displayChannels();
+        updatePlaylistStatus();
+        showNotification('Playlist loaded!');
     } catch (error) {
         console.error('Error loading playlist:', error);
-        alert('Failed to load playlist.');
+        showNotification('Failed to load playlist.');
     }
 }
 
 function loadFile() {
     const file = document.getElementById('fileUpload').files[0];
     if (!file) return;
+    showNotification('Loading file...');
     const reader = new FileReader();
     reader.onload = function(e) {
         const text = e.target.result;
@@ -42,9 +46,11 @@ function loadFile() {
         if (extension === 'm3u') parseM3U(text);
         else if (extension === 'json') parseJSON(text);
         else if (extension === 'txt') parseText(text);
-        else return alert('Unsupported file format. Use .m3u, .json, or .txt.');
-        addToHistory(file.name, 'File');
+        else return showNotification('Unsupported file format.');
+        addToHistory(file.name);
         displayChannels();
+        updatePlaylistStatus();
+        showNotification('File loaded!');
     };
     reader.readAsText(file);
 }
@@ -60,8 +66,8 @@ function parseM3U(data) {
             const groupMatch = line.match(/group-title="([^"]+)"/);
             currentChannel.name = nameMatch ? nameMatch[1] : 'Unnamed';
             currentChannel.group = groupMatch ? groupMatch[1] : 'General';
-            currentChannel.rating = line.includes('adult') ? 'R' : 'G';
             currentChannel.favourite = false;
+            currentChannel.logo = line.match(/tvg-logo="([^"]+)"/)?.[1] || '';
         } else if (line && !line.startsWith('#')) {
             currentChannel.url = line;
             channels.push({ ...currentChannel });
@@ -78,12 +84,12 @@ function parseJSON(data) {
             name: item.name || 'Unnamed',
             url: item.url,
             group: item.group || 'General',
-            rating: item.rating || 'G',
-            favourite: item.favourite || false
+            favourite: item.favourite || false,
+            logo: item.logo || ''
         }));
         localStorage.setItem('channels', JSON.stringify(channels));
     } catch (error) {
-        alert('Invalid JSON format.');
+        showNotification('Invalid JSON format.');
     }
 }
 
@@ -95,8 +101,8 @@ function parseText(data) {
             name: `Channel ${i + 1}`,
             url,
             group: 'General',
-            rating: 'G',
-            favourite: false
+            favourite: false,
+            logo: ''
         }));
     localStorage.setItem('channels', JSON.stringify(channels));
 }
@@ -111,21 +117,17 @@ function displayChannels() {
         const groupDiv = document.createElement('div');
         const channelsInGroup = channels.filter(c => c.group === group && (!showFavourites || c.favourite) && c.name.toLowerCase().includes(filter));
         if (channelsInGroup.length > 0) {
-            const h3 = document.createElement('h3');
-            h3.textContent = group;
-            groupDiv.appendChild(h3);
             channelsInGroup.forEach(channel => {
-                if (currentProfile === 'child' && channel.rating === 'R' && !checkParentalPin()) return;
                 const div = document.createElement('div');
                 div.className = 'channel';
                 if (channel.url === currentChannelUrl) div.classList.add('selected');
-                div.innerHTML = `${channel.name} <span class="fav-star">${channel.favourite ? '★' : '☆'}</span>`;
+                div.innerHTML = `${channel.name} <span class="fav-star"><i class="fas fa-star"></i></span>`;
                 div.querySelector('.fav-star').onclick = (e) => {
                     e.stopPropagation();
                     toggleFavourite(channel);
                 };
                 div.onclick = (e) => {
-                    if (e.target.className !== 'fav-star') playChannel(channel.url, channel.name);
+                    if (e.target.className !== 'fav-star' && !e.target.closest('.fav-star')) playChannel(channel.url, channel.name, channel.logo);
                 };
                 groupDiv.appendChild(div);
             });
@@ -149,29 +151,42 @@ function filterChannels() {
     displayChannels();
 }
 
-function playChannel(url, name) {
-    if (currentProfile === 'child' && !checkParentalPin()) return;
+async function playChannel(url, name, logo = '') {
     if (hls) hls.destroy();
+    showNotification('Loading stream...');
+    currentChannelUrl = url;
+    currentStreamName = name;
     if (Hls.isSupported() && url.includes('.m3u8')) {
         hls = new Hls();
         hls.loadSource(url);
         hls.attachMedia(videoPlayer);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => videoPlayer.play());
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            videoPlayer.play();
+            updateNowPlaying(name, logo);
+            addToRecentPlays(url, name);
+            showNotification('Stream loaded!');
+        });
     } else {
         videoPlayer.src = url;
-        videoPlayer.play();
+        videoPlayer.play().then(() => {
+            updateNowPlaying(name, logo);
+            addToRecentPlays(url, name);
+            showNotification('Stream loaded!');
+        }).catch(() => showNotification('Error playing stream.'));
     }
     videoPlayer.ontimeupdate = () => {
         localStorage.setItem(`progress-${url}`, JSON.stringify({ time: videoPlayer.currentTime, name }));
     };
     const progress = JSON.parse(localStorage.getItem(`progress-${url}`));
     if (progress) videoPlayer.currentTime = progress.time;
-    currentChannelUrl = url;
-    displayChannels(); // Refresh to highlight the selected channel
+    playPauseBtn.querySelector('i').className = 'fas fa-pause';
+    updateQualityIndicator(url);
+    displayChannels();
 }
 
 function toggleSidebar() {
     sidebar.classList.toggle('collapsed');
+    if (window.innerWidth <= 768) sidebar.classList.toggle('active');
 }
 
 function toggleTheme() {
@@ -185,31 +200,8 @@ if (localStorage.getItem('theme') === 'dark') {
     themeToggle.checked = true;
 }
 
-function changeLanguage() {
-    const lang = document.getElementById('language').value;
-    document.getElementById('loadBtn').textContent = translations[lang].load;
-    document.getElementById('playlistUrl').placeholder = translations[lang].placeholder;
-    document.querySelector('button[onclick="setParentalPin()"]').textContent = translations[lang].pin;
-}
-
-function setParentalPin() {
-    parentalPin = document.getElementById('parentalPin').value;
-    localStorage.setItem('parentalPin', parentalPin);
-    alert('Parental PIN set.');
-}
-
-function checkParentalPin() {
-    return parentalPin ? prompt('Enter Parental PIN') === parentalPin : true;
-}
-
-function switchProfile() {
-    currentProfile = document.getElementById('profile').value;
-    localStorage.setItem('currentProfile', currentProfile);
-    displayChannels();
-}
-
-function addToHistory(source, type) {
-    history.unshift({ source, type, date: new Date().toLocaleString() });
+function addToHistory(source) {
+    history.unshift({ source, date: new Date().toLocaleString() });
     if (history.length > 10) history.pop();
     localStorage.setItem('uploadHistory', JSON.stringify(history));
 }
@@ -221,38 +213,167 @@ function toggleHistory() {
         historyList.style.display = 'block';
         historyList.innerHTML = history.map(h => `
             <div class="history-item">
-                ${h.type}: ${h.source} (${h.date})
-                <button onclick="loadFromHistory('${h.source}', '${h.type}')">⬇</button>
+                ${h.source} (${h.date})
+                <button onclick="loadFromHistory('${h.source}')"><i class="fas fa-download"></i></button>
             </div>
-        `).join('') + '<button onclick="clearHistory()">🗑️</button>';
+        `).join('');
     } else {
         channelList.style.display = 'block';
         historyList.style.display = 'none';
     }
 }
 
-function loadFromHistory(source, type) {
-    if (type === 'URL') {
+function loadFromHistory(source) {
+    if (source.startsWith('http://') || source.startsWith('https://')) {
         document.getElementById('playlistUrl').value = source;
         loadPlaylist();
     } else {
-        alert('Please re-upload the file manually.');
+        showNotification('Please re-upload the file manually.');
     }
 }
 
-function clearHistory() {
+function clearAllData() {
     history = [];
-    localStorage.setItem('uploadHistory', JSON.stringify(history));
+    channels = [];
+    recentPlays = [];
+    localStorage.clear();
+    displayChannels();
     toggleHistory();
+    updatePlaylistStatus();
+    showNotification('All data cleared!');
 }
 
-videoPlayer.addEventListener('dblclick', () => {
+function updatePlaylistStatus() {
+    const total = channels.length;
+    let active = 0;
+    Promise.all(channels.map(channel => 
+        fetch(channel.url, { method: 'HEAD', timeout: 5000 })
+            .then(() => active++)
+            .catch(() => {})
+    )).then(() => {
+        playlistStatus.innerHTML = `
+            <span class="total">Total: ${total}</span>
+            <span class="active">Active: ${active}</span>
+            <span class="offline">Offline: ${total - active}</span>
+        `;
+    });
+}
+
+setInterval(updatePlaylistStatus, 5 * 60 * 1000); // Every 5 minutes
+
+function updateNowPlaying(name, logo) {
+    nowPlaying.style.display = 'block';
+    nowPlaying.innerHTML = logo ? `<img src="${logo}" alt="${name}" style="max-height: 24px; vertical-align: middle; margin-right: 10px;">${name}` : name;
+}
+
+function showNotification(message, duration = 3000) {
+    notification.textContent = message;
+    notification.style.display = 'block';
+    setTimeout(() => notification.style.display = 'none', duration);
+}
+
+function togglePlayPause() {
+    if (videoPlayer.paused) {
+        videoPlayer.play();
+        playPauseBtn.querySelector('i').className = 'fas fa-pause';
+    } else {
+        videoPlayer.pause();
+        playPauseBtn.querySelector('i').className = 'fas fa-play';
+    }
+}
+
+function toggleFullscreen() {
     if (document.fullscreenElement) {
         document.exitFullscreen();
     } else {
         videoPlayer.requestFullscreen();
     }
+}
+
+function togglePiP() {
+    if (document.pictureInPictureElement) {
+        document.exitPictureInPicture();
+    } else if (videoPlayer.paused) {
+        showNotification('Play video to enable PiP.');
+    } else {
+        videoPlayer.requestPictureInPicture();
+    }
+}
+
+async function castStream() {
+    try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        videoPlayer.srcObject = stream;
+        videoPlayer.play();
+        showNotification('Casting started!');
+        stream.getVideoTracks()[0].onended = () => {
+            playChannel(currentChannelUrl, currentStreamName);
+            showNotification('Casting stopped.');
+        };
+    } catch (error) {
+        showNotification('Casting failed.');
+    }
+}
+
+function loadSubtitles() {
+    const file = document.getElementById('subtitleUpload').files[0];
+    if (!file || !file.name.endsWith('.srt')) return showNotification('Please upload an .srt file.');
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const track = document.getElementById('subtitleTrack');
+        track.src = URL.createObjectURL(file);
+        track.default = true;
+        if (videoPlayer.duration > 3600 || currentStreamName.toLowerCase().includes('movie')) {
+            track.style.display = 'block';
+        }
+        showNotification('Subtitles loaded!');
+    };
+    reader.readAsDataURL(file);
+}
+
+function playRandom() {
+    const randomChannel = channels[Math.floor(Math.random() * channels.length)];
+    playChannel(randomChannel.url, randomChannel.name, randomChannel.logo);
+}
+
+function updateQualityIndicator(url) {
+    qualityIndicator.textContent = url.match(/1080|hd/i) ? 'HD' : 'SD';
+}
+
+function addToRecentPlays(url, name) {
+    recentPlays.unshift({ url, name, date: new Date().toLocaleString() });
+    if (recentPlays.length > 10) recentPlays.pop();
+    localStorage.setItem('recentPlays', JSON.stringify(recentPlays));
+}
+
+// Keyboard Shortcuts
+document.addEventListener('keydown', (e) => {
+    switch (e.key) {
+        case ' ': togglePlayPause(); e.preventDefault(); break;
+        case 'f': toggleFullscreen(); break;
+        case 'p': togglePiP(); break;
+        case 'r': playRandom(); break;
+    }
 });
 
-// Initial setup
+// Touch Gestures
+let lastTap = 0;
+videoPlayer.addEventListener('touchstart', (e) => {
+    const now = Date.now();
+    if (now - lastTap < 300) togglePlayPause();
+    lastTap = now;
+});
+
+let touchStartY = 0;
+videoPlayer.addEventListener('touchstart', (e) => touchStartY = e.touches[0].clientY);
+videoPlayer.addEventListener('touchend', (e) => {
+    const touchEndY = e.changedTouches[0].clientY;
+    if (touchStartY - touchEndY > 50) toggleFullscreen();
+    if (touchEndY - touchStartY > 50) document.fullscreenElement ? document.exitFullscreen() : null;
+});
+
+// Initial Setup
 displayChannels();
+updatePlaylistStatus();
+videoPlayer.addEventListener('play', () => playPauseBtn.querySelector('i').className = 'fas fa-pause');
+videoPlayer.addEventListener('pause', () => playPauseBtn.querySelector('i').className = 'fas fa-play');
