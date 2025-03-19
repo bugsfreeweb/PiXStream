@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xStream IPTV</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1>xStream</h1>
+            </div>
+            <div class="sidebar-content">
+                <!-- Playlist -->
+                <div class="sidebar-section">
+                    <h3>Playlist</h3>
+                    <input type="text" id="playlistUrl" placeholder="Enter Playlist URL">
+                    <button onclick="loadPlaylist()" id="loadBtn">⬇</button>
+                    <input type="file" id="fileUpload" accept=".m3u,.json,.txt" onchange="loadFile()">
+                    <button onclick="toggleFavourites()">★</button>
+                    <button onclick="toggleHistory()">↻</button>
+                </div>
+
+                <!-- Channels -->
+                <div class="sidebar-section">
+                    <h3>Channels</h3>
+                    <input type="text" id="filter" placeholder="Search Channels" onkeyup="filterChannels()">
+                    <div class="channel-list" id="channelList"></div>
+                    <div class="history-list" id="historyList" style="display: none;"></div>
+                </div>
+
+                <!-- Settings -->
+                <div class="sidebar-section">
+                    <h3>Settings</h3>
+                    <select id="language" onchange="changeLanguage()">
+                        <option value="en">EN</option>
+                        <option value="es">ES</option>
+                    </select>
+                    <input type="password" id="parentalPin" placeholder="Set Parental PIN">
+                    <button onclick="setParentalPin()">🔒</button>
+                    <select id="profile" onchange="switchProfile()">
+                        <option value="adult">👤</option>
+                        <option value="child">👶</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player -->
+        <div class="player-section" id="playerSection">
+            <div class="top-controls" id="topControls">
+                <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
+                    <span class="toggle-icon">☰</span>
+                </button>
+                <label class="theme-switch">
+                    <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <video id="videoPlayer" controls autoplay>
+                <track kind="subtitles" id="subtitleTrack" src="" srclang="en" label="English">
+                Your browser doesn’t support video playback.
+            </video>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</body>
+</html>
